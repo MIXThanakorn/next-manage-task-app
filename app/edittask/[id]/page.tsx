@@ -1,10 +1,9 @@
-// edittask/[id]/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import logo from "../../../assets/logo.png";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -18,15 +17,10 @@ type Task = {
   update_at: string;
 };
 
-type EditTaskPageProps = {
-  params: {
-    id: string;
-  };
-};
-
-export default function EditTaskPage({ params }: EditTaskPageProps) {
+export default function EditTaskPage() {
   const router = useRouter();
-  const taskId = params.id;
+  const params = useParams();
+  const taskId = params?.id as string;
 
   const [title, setTitle] = useState<string>("");
   const [detail, setDetail] = useState<string>("");
@@ -35,15 +29,12 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
   const [originalImageUrl, setOriginalImageUrl] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  // State สำหรับจัดการรูปภาพใหม่
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string>("");
 
   useEffect(() => {
     async function fetchTask() {
       if (!taskId) return;
-
       const { data, error } = await supabase
         .from("task_tb")
         .select("title, detail, is_complete, image_url")
@@ -72,18 +63,15 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
     fetchTask();
   }, [taskId, router]);
 
-  // ฟังก์ชันสำหรับการเลือกรูปใหม่
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setNewImageFile(file);
-      // สร้าง preview URL
       const previewUrl = URL.createObjectURL(file);
       setNewImagePreview(previewUrl);
     }
   };
 
-  // ฟังก์ชันสำหรับลบรูปใหม่ที่เพิ่งอัพโหลด
   const handleRemoveNewImage = () => {
     setNewImageFile(null);
     if (newImagePreview) {
@@ -92,19 +80,14 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
     }
   };
 
-  // ฟังก์ชันสำหรับลบรูปเก่า
   const handleRemoveOldImage = async () => {
     if (!originalImageUrl) return;
-
     const confirmDelete = confirm("คุณต้องการลบรูปภาพเก่าหรือไม่?");
     if (!confirmDelete) return;
 
     try {
-      // ดึงชื่อไฟล์จาก URL
       const urlParts = originalImageUrl.split("/");
       const fileName = urlParts[urlParts.length - 1];
-
-      // ลบไฟล์จาก Storage
       const { error: deleteError } = await supabase.storage
         .from("task_bk")
         .remove([fileName]);
@@ -114,7 +97,6 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
         return;
       }
 
-      // อัปเดตฐานข้อมูลให้ image_url เป็น null
       const { error: updateError } = await supabase
         .from("task_tb")
         .update({ image_url: null, update_at: new Date().toISOString() })
@@ -136,28 +118,22 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!title.trim()) {
       alert("กรุณากรอกชื่องาน");
       return;
     }
-
     setIsSubmitting(true);
 
     try {
       let finalImageUrl = imageUrl;
 
-      // ถ้ามีการเลือกรูปใหม่
       if (newImageFile) {
-        // ลบรูปเก่าก่อน (ถ้ามี)
         if (originalImageUrl) {
           const urlParts = originalImageUrl.split("/");
           const oldFileName = urlParts[urlParts.length - 1];
-
           await supabase.storage.from("task_bk").remove([oldFileName]);
         }
 
-        // อัพโหลดรูปใหม่
         const fileExt = newImageFile.name.split(".").pop();
         const fileName = `${taskId}_${Date.now()}.${fileExt}`;
 
@@ -171,7 +147,6 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
           return;
         }
 
-        // ดึง URL ของรูปใหม่
         const { data: urlData } = supabase.storage
           .from("task_bk")
           .getPublicUrl(fileName);
@@ -179,7 +154,6 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
         finalImageUrl = urlData.publicUrl;
       }
 
-      // อัปเดตข้อมูลในฐานข้อมูล
       const { error } = await supabase
         .from("task_tb")
         .update({
@@ -214,7 +188,7 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
 
   return (
     <div className="flex flex-col w-10/12 mx-auto min-h-screen pb-10">
-      <div className="flex flex-col items-center mt-20 ">
+      <div className="flex flex-col items-center mt-20">
         <Image src={logo} alt="Logo" width={150} height={150} />
         <h1 className="text-2xl font-bold mt-5">Manage Task App</h1>
         <h1 className="text-2xl font-bold">แก้ไขงานที่ต้องทำ</h1>
@@ -245,11 +219,9 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
             />
           </div>
 
-          {/* ส่วนจัดการรูปภาพ */}
           <div className="flex flex-col mt-5">
             <label className="text-lg font-bold">รูปภาพ</label>
 
-            {/* แสดงรูปเก่า */}
             {imageUrl && !newImagePreview && (
               <div className="mt-3 flex flex-col">
                 <img
@@ -267,7 +239,6 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
               </div>
             )}
 
-            {/* แสดงรูปใหม่ (Preview) */}
             {newImagePreview && (
               <div className="mt-3 flex flex-col">
                 <p className="text-sm text-green-600 mb-2">รูปใหม่:</p>
@@ -286,7 +257,6 @@ export default function EditTaskPage({ params }: EditTaskPageProps) {
               </div>
             )}
 
-            {/* ปุ่มแก้ไขรูป */}
             <div className="mt-3">
               <label
                 htmlFor="image-upload"

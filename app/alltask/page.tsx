@@ -12,7 +12,7 @@ type Task = {
   title: string;
   detail: string;
   is_complete: boolean;
-  image_url: string; // อาจจะเป็น null หรือ string
+  image_url: string;
   create_at: string;
   update_at: string;
 };
@@ -20,7 +20,6 @@ type Task = {
 export default function Page() {
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  // ... (ส่วน fetchTasks เดิม) ...
   async function fetchTasks() {
     const { data, error } = await supabase
       .from("task_tb")
@@ -41,9 +40,7 @@ export default function Page() {
     fetchTasks();
   }, []);
 
-  // --- New Delete Functionality (แก้ไขส่วนนี้) ---
   const handleDelete = async (task: Task) => {
-    // 1. Show confirmation dialog with task details
     const confirmDelete = confirm(
       `คุณแน่ใจที่จะลบงานนี้หรือไม่?\n\nงานที่ต้องทำ: ${task.title}\nรายละเอียด: ${task.detail}`
     );
@@ -51,34 +48,24 @@ export default function Page() {
     if (confirmDelete) {
       let storageError = null;
 
-      // 2.1 ตรวจสอบและลบรูปภาพออกจาก Supabase Storage (ถ้ามี)
       if (task.image_url) {
-        // ต้องแยก File Path จาก URL ของ Supabase Storage
-        // รูปแบบ URL: [Supabase URL]/storage/v1/object/public/task_bk/[filePath]
         const urlParts = task.image_url.split("task_bk/");
         if (urlParts.length > 1) {
           const filePath = urlParts[1];
           const { error } = await supabase.storage
-            .from("task_bk") // ชื่อ bucket ที่คุณระบุ
+            .from("task_bk")
             .remove([filePath]);
 
           if (error) {
             storageError = error;
             console.error("Error deleting image from storage:", error);
-            // แสดงคำเตือน แต่จะดำเนินการลบข้อมูลใน DB ต่อไป
             alert(
               "Warning: Error deleting image from storage. Attempting to delete task record."
             );
           }
-        } else {
-          console.warn(
-            "Could not parse file path from image_url:",
-            task.image_url
-          );
         }
       }
 
-      // 2.2 Perform the delete operation on Supabase (task_tb)
       const { error: dbError } = await supabase
         .from("task_tb")
         .delete()
@@ -88,9 +75,7 @@ export default function Page() {
         alert("Error deleting task record, please try again later");
         console.error("Error deleting task record:", dbError);
       } else {
-        // 3. Update the state to remove the task from the list without a full reload
         setTasks((prevTasks) => prevTasks.filter((t) => t.id !== task.id));
-
         let successMessage = `ลบงาน "${task.title}" สำเร็จแล้ว`;
         if (storageError) {
           successMessage += " (แต่มีปัญหาในการลบรูปภาพจาก Storage)";
@@ -99,9 +84,7 @@ export default function Page() {
       }
     }
   };
-  // ---------------------------------
 
-  // ... (ส่วน return เดิม) ...
   return (
     <div className="flex flex-col w-10/12 mx-auto min-h-screen mb-10">
       <div className="flex flex-col items-center mt-20">
@@ -142,6 +125,7 @@ export default function Page() {
                       alt={task.title}
                       width={50}
                       height={50}
+                      className="mx-auto rounded"
                     />
                   ) : (
                     "ไม่มีรูป"
@@ -170,7 +154,7 @@ export default function Page() {
                     แก้ไข
                   </Link>
                   <button
-                    onClick={() => handleDelete(task)} // Attach the handler here
+                    onClick={() => handleDelete(task)}
                     className="bg-red-400 hover:bg-red-700 text-white font-bold py-3 px-4 rounded cursor-pointer"
                   >
                     ลบ
@@ -181,7 +165,8 @@ export default function Page() {
           </tbody>
         </table>
       </div>
-      <div className="flex justify-center mt 15">
+
+      <div className="flex justify-center mt-10">
         <Link
           href="/"
           className="mt-7 bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded cursor-pointer"
