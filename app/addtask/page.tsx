@@ -7,6 +7,8 @@ import { useState, useEffect, use } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+// นำเข้า uuidv4 เพื่อสร้างชื่อไฟล์ที่ไม่ซ้ำกัน
+import { v4 as uuidv4 } from "uuid"; // ต้องติดตั้ง package นี้ด้วย: npm install uuid หรือ yarn add uuid
 
 export default function Page() {
   const router = useRouter();
@@ -38,22 +40,54 @@ export default function Page() {
     }
 
     setIsSubmitting(true);
+    let imageUrl: string | null = null; // ตัวแปรสำหรับเก็บ URL ของรูปภาพ
 
     try {
-      const { data, error } = await supabase.from("task_tb").insert({
+      // 1. อัปโหลดรูปภาพไปยัง Supabase Storage
+      if (imageFile) {
+        // สร้างชื่อไฟล์ที่ไม่ซ้ำกัน
+        const fileName = `${uuidv4()}-${imageFile.name}`;
+
+        // อัปโหลดไฟล์ไปยัง Bucket ชื่อ 'task_bk'
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("task_bk") // ใช้ชื่อ Bucket ที่ต้องการ: 'task_bk'
+          .upload(fileName, imageFile, {
+            // path คือ fileName และ fileBody คือ imageFile
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error("Storage upload error:", uploadError);
+          alert("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ");
+          setIsSubmitting(false);
+          return; // หยุดการทำงานถ้าอัปโหลดรูปภาพล้มเหลว
+        }
+
+        // 2. ดึง Public URL ของรูปภาพ
+        const { data: publicUrlData } = supabase.storage
+          .from("task_bk")
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrlData.publicUrl; // เก็บ URL สาธารณะ
+      }
+
+      // 3. บันทึกข้อมูลงานลงในฐานข้อมูล
+      const { data, error: dbError } = await supabase.from("task_tb").insert({
         title: title,
         detail: detail,
         is_complete: isComplete,
-        image_url: preview_file,
+        image_url: imageUrl, // ใช้ URL ที่ได้จากการอัปโหลด
       });
 
-      if (error) {
-        console.error("Error:", error);
+      if (dbError) {
+        console.error("Database insert error:", dbError);
         alert("เกิดข้อผิดพลาดในการบันทึกงาน");
       } else {
         console.log("Success:", data);
         alert("บันทึกงานเรียบร้อยแล้ว");
 
+        // ล้างค่าหลังจากบันทึกสำเร็จ
         setTitle("");
         setDetail("");
         setImageFile(null);
@@ -66,6 +100,8 @@ export default function Page() {
     } finally {
       setIsSubmitting(false);
     }
+    // 4. กลับไปที่หน้า alltask
+    router.push("/alltask");
   };
 
   return (

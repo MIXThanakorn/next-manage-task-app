@@ -10,6 +10,9 @@ const prompt = Prompt({
 export const metadata: Metadata = {
   title: "Task App by Thanakorn DTISAU",
   description: "To save your tasks",
+  icons: {
+    icon: "/assets/logo.png",
+  },
 };
 
 export default function RootLayout({
